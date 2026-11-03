@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitoreo Selecciones Cundinamarca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#eef1ee;--surface:#fff;--ink:#1c2a26;--muted:#5d6b66;--line:#d5ddd8;--brand:#0f5c4d;--brand2:#e0a21b;
+--ok:#1e8449;--ok-bg:#e1f3e8;--warn:#a86a00;--warn-bg:#fdf0d2;--bad:#b3261e;--bad-bg:#fbe3e0}
+@media (prefers-color-scheme:dark){:root{--bg:#121917;--surface:#1b2522;--ink:#e6eeea;--muted:#9bada6;--line:#2c3a35;--brand:#4cc2a8;--brand2:#f0b83a;
+--ok:#59c785;--ok-bg:#183a28;--warn:#f0b83a;--warn-bg:#3d3114;--bad:#ff8a80;--bad-bg:#43201d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Barlow,system-ui,sans-serif}
+h1,h2,.num{font-family:"Barlow Semi Condensed",sans-serif}
+header{background:var(--brand);color:#fff;padding:20px 28px;display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between}
+@media (prefers-color-scheme:dark){header{background:#0c2b25}}
+header h1{margin:0;font-size:28px;letter-spacing:.2px}
+header p{margin:2px 0 0;opacity:.85}
+#status{font-size:13px;opacity:.9;text-align:right}
+button{font:inherit;cursor:pointer;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;padding:5px 12px;border-radius:6px;margin-left:8px}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--brand2);outline-offset:1px}
+main{max-width:1280px;margin:0 auto;padding:20px 20px 40px}
+.filters{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.filters label{display:flex;flex-direction:column;font-size:13px;color:var(--muted);gap:3px}
+select,input[type=date]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:140px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:18px}
+.kpi{background:var(--surface);border-left:5px solid var(--brand);padding:12px 16px;border-radius:4px}
+.kpi.k2{border-color:var(--brand2)}
+.kpi span{display:block;color:var(--muted);font-size:13px}
+.kpi b{font-family:"Barlow Semi Condensed";font-size:30px;line-height:1.15;font-weight:600;overflow-wrap:anywhere}
+.kpi b.sm{font-size:20px}
+.panel{background:var(--surface);border-radius:6px;padding:16px;margin-bottom:18px;border:1px solid var(--line)}
+.panel h2{margin:0 0 10px;font-size:19px;font-weight:600}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:13px;cursor:pointer;position:sticky;top:0;background:var(--surface)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600}
+.OPTIMO{background:var(--ok-bg);color:var(--ok)}.ALERTA{background:var(--warn-bg);color:var(--warn)}.PRECAUCION{background:var(--bad-bg);color:var(--bad)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.grid3 .panel{margin:0}
+.chartbox{position:relative;height:260px}
+.note{font-size:13px;color:var(--muted);margin:10px 0 0}
+#msg{display:none;background:var(--bad-bg);color:var(--bad);padding:14px 16px;border-radius:6px;margin-bottom:18px}
+footer{text-align:center;color:var(--muted);font-size:13px;padding-bottom:24px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Monitoreo selecciones Cundinamarca</h1>
+    <p id="subtitulo">Seguimiento y control del entrenamiento</p>
+  </div>
+  <div id="status">Cargando datos…<button id="refresh" type="button">Actualizar</button></div>
+</header>
+
+<main>
+  <div id="msg" role="alert"></div>
+
+  <div class="filters" id="filters">
+    <label>Deporte<select id="f-deporte"></select></label>
+    <label>Género<select id="f-genero"></select></label>
+    <label>Entrenador<select id="f-entrenador"></select></label>
+    <label>Plan Estrellas<select id="f-plan"></select></label>
+    <label>Desde<input type="date" id="f-desde"></label>
+    <label>Hasta<input type="date" id="f-hasta"></label>
+  </div>
+
+  <section class="kpis">
+    <div class="kpi"><span>Total de deportistas</span><b id="k-atletas">–</b></div>
+    <div class="kpi"><span>Sesiones registradas</span><b id="k-sesiones">–</b></div>
+    <div class="kpi k2"><span>Atletas en precaución</span><b id="k-riesgo">–</b></div>
+    <div class="kpi"><span>Plan Estrellas</span><b class="sm" id="k-plan">–</b></div>
+    <div class="kpi"><span>Metodólogo a cargo</span><b class="sm" id="k-metodologo">–</b></div>
+  </section>
+
+  <section class="panel">
+    <h2>Datos generales del entrenamiento</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th data-k="atleta">Atleta</th>
+          <th data-k="carga" class="n">Carga de la sesión</th>
+          <th data-k="mono" class="n">Monotonía</th>
+          <th data-k="strain" class="n">Tensión (Strain)</th>
+          <th data-k="estado">Estado</th>
+          <th data-k="asistencia" class="n">Asistencia</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="note" id="ventana"></p>
+    <p class="note"><b>Monotonía</b> &lt; 1,5 óptima; entre 1,5 y 2,0 alerta (cargas planas); ≥ 2,0 riesgo crítico, sobre todo con tensión alta (Foster, 1998, <i>Med Sci Sports Exerc</i> 30(7), 1164–1168).</p>
+  </section>
+
+  <section class="grid3">
+    <div class="panel"><h2>Tipo de sesión</h2><div class="chartbox"><canvas id="c-tipo"></canvas></div></div>
+    <div class="panel"><h2>Tiempo de sesión (minutos)</h2><div class="chartbox"><canvas id="c-tiempo"></canvas></div></div>
+    <div class="panel"><h2>Autoevaluación de desempeño</h2><div class="chartbox"><canvas id="c-auto"></canvas></div></div>
+  </section>
+</main>
+<footer id="footer"></footer>
+
+<script>
+/* =====================================================================
+   CONFIGURACIÓN: edita solo este bloque
+   ===================================================================== */
+const CONFIG = {
+  SHEET_ID: "1ANnrdJLek0iAQQbSJTvSCC6qNyO91XdYiLoSq3hncCQ",
+  PESTANAS: ["Base Maestra", "Respuestas de formulario 1"], // se intenta en este orden; usa la primera que funcione
+  // Palabras clave para reconocer cada columna por su encabezado (sin tildes, en minúscula). Con "=" al inicio, el encabezado debe ser exactamente ese texto.
+  // Se usa la primera columna cuyo encabezado contenga alguna de estas palabras, en el orden escrito.
+  COLUMNAS: {
+    fecha: ["marca temporal", "solo fecha", "fecha"],
+    atleta: ["deportista", "atleta"],
+    deporte: ["deporte que practica", "deporte"],
+    genero: ["genero"],
+    entrenador: ["entrenador"],
+    plan: ["plan estrellas"],
+    tipo: ["=tipo de sesion", "tipo de sesion"],
+    minutos: ["=duracion de la sesion", "duracion", "minutos"],
+    rpe: ["percepcion del esfuerzo", "rpe"],
+    auto: ["auto evaluacion", "autoevaluacion"],
+    carga: ["carga de la sesion"],   // si existe y tiene valor se usa; si no, minutos × RPE
+    asistio: ["asistio", "asistencia"] // opcional: sin esta columna cada fila cuenta como una sesión asistida
+  },
+  METODOLOGO_DEFAULT: "PABLO HUERTAS",
+  VENTANA_DIAS: 0,             // 0 = todo el periodo filtrado (como el tablero de referencia); 7 = última semana
+  UMBRAL_STRAIN: 4000,         // tensión desde la cual el estado es PRECAUCIÓN
+  REFRESCO_MIN: 5
+};
+/* ===================================================================== */
+
+const $ = id => document.getElementById(id);
+const MESES = {ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,sept:8,oct:9,nov:10,dic:11};
+let ROWS = [], charts = {}, sortKey = "carga", sortDir = -1, TABLE = [];
+
+/* ---------- Lectura de la hoja (endpoint gviz, formato CSV) ---------- */
+function parseCSV(t){
+  const out=[];let row=[],f="",q=false;
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){ if(c=='"'){ if(t[i+1]=='"'){f+='"';i++} else q=false } else f+=c }
+    else if(c=='"') q=true;
+    else if(c==','){row.push(f);f=""}
+    else if(c=='\n'){row.push(f);out.push(row);row=[];f=""}
+    else if(c!='\r') f+=c;
+  }
+  if(f.length||row.length){row.push(f);out.push(row)}
+  return out;
+}
+function parseFecha(s){
+  s=(s||"").trim().toLowerCase(); if(!s) return null;
+  let m;
+  if(/^\d{5}(\.\d+)?$/.test(s)) return new Date(1899,11,30+Math.floor(+s)); // número de serie de Sheets
+  if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)) return new Date(+m[1],m[2]-1,+m[3]);
+  if(m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)) return new Date(+m[3],m[2]-1,+m[1]); // DD/MM/AAAA
+  if(m=s.match(/^(\d{1,2})\s+([a-zñ]+)\.?\s+(\d{4})/)){ const mm=MESES[m[2].slice(0,4)] ?? MESES[m[2].slice(0,3)]; if(mm!==undefined) return new Date(+m[3],mm,+m[1]); }
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+const num = v => { const n=parseFloat(String(v||"").replace(/\./g,"").replace(",",".")); return isNaN(n)?0:n };
+const numPlain = v => { const n=parseFloat(String(v||"").replace(",",".")); return isNaN(n)?0:n };
+const iso = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+
+async function leer(tab){
+    const url=`https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}&_=${Date.now()}`;
+    const r=await fetch(url); if(!r.ok) throw new Error("HTTP "+r.status);
+    const data=parseCSV(await r.text());
+    if(data.length<2) throw new Error("La pestaña está vacía");
+    const norm=t=>(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+    const head=data[0].map(norm), C=CONFIG.COLUMNAS, idx={};
+    for(const k in C){ idx[k]=-1; for(const kw of C[k]){ const i=head.findIndex(h=>kw[0]==="="?h===kw.slice(1):h.includes(kw)); if(i>=0){idx[k]=i;break} } }
+    const faltan=["fecha","atleta"].filter(k=>idx[k]<0).concat(idx.carga<0?["minutos","rpe"].filter(k=>idx[k]<0):[]);
+    if(faltan.length) throw new Error("No encuentro las columnas: "+faltan.join(", ")+". Encabezados detectados: "+data[0].join(" | "));
+    const col=n=>head.indexOf(n);
+    const SES=[null,1,2,3,4].map(k=>k&&({tipo:col("tipo de sesion "+k),min:col("duracion de la sesion "+k),auto:col("auto sesion "+k)}));
+    const SES_OK=SES.slice(1).some(x=>x.tipo>=0&&x.min>=0);
+    const g=(row,k)=> idx[k]>=0 ? (row[idx[k]]||"").trim() : "";
+    const fechaAlt=row=>{ const i=head.findIndex(h=>h.includes("solo fecha")); return i>=0?row[i]:"" };
+    ROWS=data.slice(1).map(row=>{
+      const fecha=parseFecha(g(row,"fecha"))||parseFecha(fechaAlt(row)); if(!fecha||!g(row,"atleta")) return null;
+      const min=numPlain(g(row,"minutos")), rpe=numPlain(g(row,"rpe")), asi=norm(g(row,"asistio"));
+      const cs=numPlain(g(row,"carga")), carga=cs>0?cs:min*rpe;
+      let ses=[];
+      for(let k=1;k<=4;k++){
+        const t=row[SES[k].tipo]||"", m=numPlain(row[SES[k].min]), a=numPlain(row[SES[k].auto]);
+        if(SES[k].tipo>=0 && (t.trim()||m>0)) ses.push({tipo:t.trim(),min:m,auto:a});
+      }
+      if(!ses.length && !SES_OK && min>0) ses=[{tipo:g(row,"tipo"),min,auto:numPlain(g(row,"auto"))}];
+      return { fecha, atleta:g(row,"atleta"), deporte:g(row,"deporte"), genero:g(row,"genero"), entrenador:g(row,"entrenador"),
+        plan:g(row,"plan"), tipo:g(row,"tipo"), min, carga, ses,
+        asistio: idx.asistio<0 ? carga>0 : ["si","s","1","true","x"].includes(asi), metodologo:"" };
+    }).filter(Boolean);
+    if(!ROWS.length) throw new Error("No se encontraron filas válidas (revisa fechas y nombres)");
+}
+async function cargar(){
+  $("msg").style.display="none";
+  $("status").firstChild.textContent="Actualizando… ";
+  const errores=[];
+  for(const tab of CONFIG.PESTANAS){
+    try{
+      await leer(tab);
+      iniciarFiltros(); render();
+      $("status").firstChild.textContent=`Actualizado ${new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})} · pestaña «${tab}» `;
+      return;
+    }catch(e){ errores.push(`«${tab}»: ${e.message}`); }
+  }
+  $("msg").style.display="block";
+  $("msg").textContent="No se pudo leer la hoja. "+errores.join(" | ")+". Revisa que la hoja esté compartida como «Cualquier persona con el enlace · Lector».";
+  $("status").firstChild.textContent="Sin conexión ";
+}
+
+/* ---------- Filtros ---------- */
+const FIL=[["deporte","f-deporte"],["genero","f-genero"],["entrenador","f-entrenador"],["plan","f-plan"]];
+function iniciarFiltros(){
+  FIL.forEach(([k,id])=>{
+    const el=$(id), prev=el.value;
+    const vals=[...new Set(ROWS.map(r=>r[k]).filter(Boolean))].sort();
+    el.innerHTML='<option value="">Todos</option>'+vals.map(v=>`<option>${v.replace(/</g,"&lt;")}</option>`).join("");
+    if(vals.includes(prev)) el.value=prev;
+  });
+  if(!$("f-desde").value && ROWS.length){
+    const f=ROWS.map(r=>+r.fecha); $("f-desde").value=iso(new Date(Math.min(...f))); $("f-hasta").value=iso(new Date(Math.max(...f)));
+  }
+}
+function filtrar(){
+  const d=$("f-desde").value?new Date($("f-desde").value+"T00:00"):null, h=$("f-hasta").value?new Date($("f-hasta").value+"T23:59"):null;
+  return ROWS.filter(r=>FIL.every(([k,id])=>!$(id).value||r[k]===$(id).value)&&(!d||r.fecha>=d)&&(!h||r.fecha<=h));
+}
+
+/* ---------- Cálculos (Foster) ---------- */
+function estadistica(arr){
+  const m=arr.reduce((a,b)=>a+b,0)/arr.length;
+  const sd=arr.length>1?Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/(arr.length-1)):0;
+  return {m,sd};
+}
+function calcular(rows){
+  if(!rows.length) return [];
+  const fin=new Date(Math.max(...rows.map(r=>+r.fecha))); fin.setHours(0,0,0,0);
+  const ini=new Date(Math.min(...rows.map(r=>+r.fecha))); ini.setHours(0,0,0,0);
+  const n=CONFIG.VENTANA_DIAS>0?CONFIG.VENTANA_DIAS:Math.round((fin-ini)/864e5)+1;
+  const dias=[...Array(n)].map((_,i)=>iso(new Date(fin.getFullYear(),fin.getMonth(),fin.getDate()-(n-1-i))));
+  const por={};
+  rows.forEach(r=>{ (por[r.atleta]??=[]).push(r) });
+  return Object.entries(por).map(([atleta,rs])=>{
+    const diario=Object.fromEntries(dias.map(d=>[d,0]));
+    rs.forEach(r=>{ const k=iso(r.fecha); if(k in diario) diario[k]+=r.carga });
+    const vals=dias.map(d=>diario[d]), carga=vals.reduce((a,b)=>a+b,0), {m,sd}=estadistica(vals);
+    const mono = carga===0 ? 0 : (sd===0 ? 99 : m/sd), strain=carga*mono;
+    const estado = (mono>=2 || strain>=CONFIG.UMBRAL_STRAIN) ? "PRECAUCION" : mono>=1.5 ? "ALERTA" : "OPTIMO";
+    const motivo = strain>=CONFIG.UMBRAL_STRAIN ? " (tensión muy alta)" : mono>=2 ? " (monotonía crítica)" : mono>=1.5 ? " (cargas planas)" : "";
+    return {atleta,carga,mono,strain,estado,motivo,asistencia:rs.filter(r=>r.asistio).length};
+  });
+}
+
+/* ---------- Render ---------- */
+const fmt=(n,d=0)=>n.toLocaleString("es-CO",{minimumFractionDigits:d,maximumFractionDigits:d});
+function render(){
+  const rows=filtrar(); TABLE=calcular(rows);
+  $("k-atletas").textContent=new Set(rows.map(r=>r.atleta)).size;
+  $("k-sesiones").textContent=fmt(rows.reduce((n,r)=>n+(r.ses.length||(r.asistio?1:0)),0));
+  $("k-riesgo").textContent=TABLE.filter(t=>t.estado==="PRECAUCION").length;
+  const pl=new Map(); rows.forEach(r=>{ if(/^s[ií]$/i.test(r.plan)) pl.set(r.atleta,1) });
+  $("k-plan").textContent=pl.size+" de "+new Set(rows.map(r=>r.atleta)).size;
+  $("k-metodologo").textContent=CONFIG.METODOLOGO_DEFAULT;
+  $("ventana").textContent=`Carga, monotonía y tensión se calculan sobre ${CONFIG.VENTANA_DIAS>0?"los últimos "+CONFIG.VENTANA_DIAS+" días":"todo"} el periodo filtrado (días sin entrenar cuentan como 0). Tensión ≥ ${fmt(CONFIG.UMBRAL_STRAIN)} marca precaución.`;
+  tabla(); graficas(rows);
+}
+function tabla(){
+  const t=[...TABLE].sort((a,b)=>{const x=a[sortKey],y=b[sortKey];return (typeof x==="string"?x.localeCompare(y):x-y)*sortDir});
+  $("tbody").innerHTML=t.length?t.map(r=>`<tr><td>${r.atleta.replace(/</g,"&lt;")}</td><td class="n">${fmt(r.carga)}</td><td class="n">${r.mono>=99?"≥ 99":fmt(r.mono,2)}</td><td class="n">${fmt(r.strain,2)}</td>
+  <td><span class="badge ${r.estado}">${r.estado==="PRECAUCION"?"PRECAUCIÓN":r.estado==="OPTIMO"?"ÓPTIMO":r.estado}${r.motivo}</span></td><td class="n">${r.asistencia}</td></tr>`).join("")
+  :`<tr><td colspan="6">No hay datos con los filtros elegidos. Amplía el rango de fechas o quita algún filtro.</td></tr>`;
+}
+function dibujar(id,cfg){
+  charts[id]?.destroy();
+  const css=getComputedStyle(document.documentElement);
+  Chart.defaults.color=css.getPropertyValue("--muted").trim(); Chart.defaults.font.family="Barlow";
+  charts[id]=new Chart($(id),cfg);
+}
+function graficas(rows){
+  const css=getComputedStyle(document.documentElement), brand=css.getPropertyValue("--brand").trim(), line=css.getPropertyValue("--line").trim();
+  const opt={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}};
+  // Tipo de sesión (cuenta de sesiones)
+  const S=rows.flatMap(r=>r.ses.map(x=>({...x,fecha:r.fecha})));
+  const tipos={}; S.filter(x=>x.tipo).forEach(x=>tipos[x.tipo]=(tipos[x.tipo]||0)+1);
+  const te=Object.entries(tipos).sort((a,b)=>b[1]-a[1]);
+  dibujar("c-tipo",{type:"bar",data:{labels:te.map(e=>e[0]),datasets:[{data:te.map(e=>e[1]),backgroundColor:brand}]},
+    options:{...opt,indexAxis:"y",scales:{x:{grid:{color:line}},y:{grid:{display:false}}}}});
+  // Tiempo de sesión (distribución de duraciones)
+  const tm={}; S.filter(x=>x.min>0).forEach(x=>tm[x.min]=(tm[x.min]||0)+1);
+  const tk=Object.keys(tm).sort((a,b)=>tm[b]-tm[a]), top=tk.slice(0,8), otros=tk.slice(8).reduce((s,k)=>s+tm[k],0);
+  const pal=["#0f5c4d","#e0a21b","#2f8f9d","#b3261e","#7a5195","#6b9a3a","#d9772b","#3d5a80","#8a948f"];
+  dibujar("c-tiempo",{type:"doughnut",data:{labels:[...top.map(k=>k+" min"),...(otros?["Otros"]:[])],
+    datasets:[{data:[...top.map(k=>tm[k]),...(otros?[otros]:[])],backgroundColor:pal,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:"right"}}}});
+  // Autoevaluación promedio por fecha
+  const au={}; S.filter(x=>x.auto>0).forEach(x=>{const k=iso(x.fecha);(au[k]??=[]).push(x.auto)});
+  const ak=Object.keys(au).sort();
+  dibujar("c-auto",{type:"line",data:{labels:ak.map(k=>new Date(k+"T00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"})),
+    datasets:[{data:ak.map(k=>au[k].reduce((a,b)=>a+b,0)/au[k].length),borderColor:brand,backgroundColor:brand,tension:.25,pointRadius:3}]},
+    options:{...opt,scales:{y:{min:0,max:5,grid:{color:line}},x:{grid:{display:false}}}}});
+}
+
+/* ---------- Eventos ---------- */
+[...FIL.map(f=>f[1]),"f-desde","f-hasta"].forEach(id=>$(id).addEventListener("change",render));
+document.querySelectorAll("th[data-k]").forEach(th=>th.addEventListener("click",()=>{
+  const k=th.dataset.k; sortDir=(sortKey===k)?-sortDir:-1; sortKey=k; tabla();
+}));
+$("refresh").addEventListener("click",cargar);
+$("footer").textContent="Datos leídos en vivo desde Google Sheets · se actualizan cada "+CONFIG.REFRESCO_MIN+" min";
+cargar(); setInterval(cargar,CONFIG.REFRESCO_MIN*60000);
+</script>
+</body>
+</html>
